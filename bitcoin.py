@@ -12,6 +12,8 @@ if len(sys.argv) != 2:
     sys.exit(1)
 data_path = sys.argv[1]
 
+# data_path = "data"
+
 
 # Reading the vectors from the given csv files
 train1_90 = pd.read_csv(data_path+'/train1_90.csv')
@@ -46,10 +48,19 @@ def computeDelta(wt, X, Xi):
     float
         The output of equation 6, a prediction of the average price change.
     """
-    # YOUR CODE GOES HERE
-    pass
+    # Find Similarity of each row of Xi w.r.t. X 
+    # [:-1] does not set the Yi to the similarity function
+    # Apply functions with axis = 1, runs the lambda function on each row of the dataframe. 
+    sim = Xi.apply(lambda x_i:  similarity(X[:-1], x_i[:-1]), axis = 1)
+    # Do the exponential for all the indexes
+    exp = np.exp(wt * sim)
+    # We can extract Yi from the Xi df by doing ['Yi']
+    return np.sum(Xi['Yi'] * exp) / np.sum(exp)
 
 
+def similarity(a, b):
+  return np.dot(a - np.mean(a), b - np.mean(b)) / (len(a) * np.std(a) * np.std(b))
+  
 
 # Perform the Bayesian Regression to predict the average price change for each dataset of train2 using train1 as input. 
 # These will be used to estimate the coefficients (w0, w1, w2, and w3) in equation 8.
@@ -57,11 +68,11 @@ weight = 2  # This constant was not specified in the paper, but we will use 2.
 trainDeltaP90 = np.empty(0)
 trainDeltaP180 = np.empty(0)
 trainDeltaP360 = np.empty(0)
-for i in xrange(0,len(train1_90.index)) :
+for i in range(0,len(train1_90.index)) :
   trainDeltaP90 = np.append(trainDeltaP90, computeDelta(weight,train2_90.iloc[i],train1_90))
-for i in xrange(0,len(train1_180.index)) :
+for i in range(0,len(train1_180.index)) :
   trainDeltaP180 = np.append(trainDeltaP180, computeDelta(weight,train2_180.iloc[i],train1_180))
-for i in xrange(0,len(train1_360.index)) :
+for i in range(0,len(train1_360.index)) :
   trainDeltaP360 = np.append(trainDeltaP360, computeDelta(weight,train2_360.iloc[i],train1_360))
 
 
@@ -81,21 +92,27 @@ trainData = pd.DataFrame(d)
 # Feed the data: [deltaP, deltaP90, deltaP180, deltaP360] to train the linear model. 
 # Use the statsmodels ols function.
 # Use the variable name model for your fitted model
-# YOUR CODE HERE
-
+model = smf.ols(formula='deltaP ~ deltaP90 + deltaP180 + deltaP360', data=trainData).fit()
 # Print the weights from the model
-print model.params
+print (model.params)
 
 
 # Perform the Bayesian Regression to predict the average price change for each dataset of test using train1 as input.
 # This should be similar to above where it was computed for train2.
-# YOUR CODE HERE
+testDeltaP90 = np.empty(0)
+testDeltaP180 = np.empty(0)
+testDeltaP360 = np.empty(0)
 
+for i in range(0,len(train1_90.index)) :
+  testDeltaP90 = np.append(testDeltaP90, computeDelta(weight,test_90.iloc[i],train1_90))
+for i in range(0,len(train1_180.index)) :
+  testDeltaP180 = np.append(testDeltaP180, computeDelta(weight,test_180.iloc[i],train1_180))
+for i in range(0,len(train1_360.index)) :
+  testDeltaP360 = np.append(testDeltaP360, computeDelta(weight,test_360.iloc[i],train1_360))
 
 # Actual deltaP values for test data.
-# YOUR CODE HERE (use the right variable names so the below code works)
-
-
+testDeltaP = np.asarray(test_360[['Yi']])
+testDeltaP = np.reshape(testDeltaP, -1)
 
 # Combine all the test data
 d = {'deltaP': testDeltaP,
@@ -113,7 +130,5 @@ compareDF = pd.DataFrame(compare)
 
 
 # Compute the MSE and print the result
-# HINT: consider using the sm.mean_squared_error function
-MSE = 0.0
-# YOUR CODE HERE
-print "The MSE is %f" % (MSE)
+MSE = (sm.mean_squared_error(compareDF['Actual'], compareDF['Predicted']))
+print ("The MSE is {}".format(MSE))
